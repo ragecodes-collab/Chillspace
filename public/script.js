@@ -1,9 +1,10 @@
 // ============================================================
-//  ChillSpace v2 — Client Script
-//  New: Voice notes, Private rooms with passwords
+//  ChillSpace v3 — Client
+//  New: Message reply, Profile edit, Status, Private rooms,
+//       Invite links, Voice notes
 // ============================================================
 
-// ── DOM Elements ─────────────────────────────────────────────
+// ── DOM ──────────────────────────────────────────────────────
 const landing          = document.getElementById("landing");
 const usernameInput    = document.getElementById("username-input");
 const joinBtn          = document.getElementById("join-btn");
@@ -18,189 +19,272 @@ const currentRoomName  = document.getElementById("current-room-name");
 const roomMemberCount  = document.getElementById("room-member-count");
 const roomLockIcon     = document.getElementById("room-lock-icon");
 const typingIndicator  = document.getElementById("typing-indicator");
-const myAvatarEl       = document.getElementById("my-avatar");
-const myUsernameEl     = document.getElementById("my-username");
+const inviteBtn        = document.getElementById("invite-btn");
+const panelToggle      = document.getElementById("panel-toggle");
+const rightPanel       = document.getElementById("right-panel");
 
-// Mic / recording
-const micBtn            = document.getElementById("mic-btn");
-const recordingOverlay  = document.getElementById("recording-overlay");
-const recordingTimer    = document.getElementById("recording-timer");
+// Reply bar
+const replyBar         = document.getElementById("reply-bar");
+const replyBarName     = document.getElementById("reply-bar-name");
+const replyBarText     = document.getElementById("reply-bar-text");
+const replyCancel      = document.getElementById("reply-cancel");
+
+// Profile
+const panelAvatar      = document.getElementById("panel-avatar");
+const panelUsername    = document.getElementById("panel-username");
+const bioInput         = document.getElementById("bio-input");
+const bioCharCount     = document.getElementById("bio-char-count");
+const saveBioBtn       = document.getElementById("save-bio-btn");
+const colorGrid        = document.getElementById("color-grid");
+const statusBtns       = document.querySelectorAll(".status-btn");
+
+// Mic
+const micBtn           = document.getElementById("mic-btn");
+const recordingOverlay = document.getElementById("recording-overlay");
+const recordingTimer   = document.getElementById("recording-timer");
 
 // Create room modal
-const createRoomBtn     = document.getElementById("create-room-btn");
-const modal             = document.getElementById("create-room-modal");
-const newRoomInput      = document.getElementById("new-room-input");
-const togglePublic      = document.getElementById("toggle-public");
-const togglePrivate     = document.getElementById("toggle-private");
-const passwordWrap      = document.getElementById("password-wrap");
-const roomPasswordInput = document.getElementById("room-password-input");
-const modalCancel       = document.getElementById("modal-cancel");
-const modalConfirm      = document.getElementById("modal-confirm");
+const createRoomBtn    = document.getElementById("create-room-btn");
+const createModal      = document.getElementById("create-room-modal");
+const newRoomInput     = document.getElementById("new-room-input");
+const togglePublic     = document.getElementById("toggle-public");
+const togglePrivate    = document.getElementById("toggle-private");
+const passwordWrap     = document.getElementById("password-wrap");
+const roomPasswordInput= document.getElementById("room-password-input");
+const modalCancel      = document.getElementById("modal-cancel");
+const modalConfirm     = document.getElementById("modal-confirm");
 
-// Password modal (join private room)
-const passwordModal        = document.getElementById("password-modal");
-const passwordModalRoomName = document.getElementById("password-modal-room-name");
-const joinPasswordInput    = document.getElementById("join-password-input");
-const passwordError        = document.getElementById("password-error");
-const passwordModalCancel  = document.getElementById("password-modal-cancel");
-const passwordModalConfirm = document.getElementById("password-modal-confirm");
+// Password modal
+const passwordModal    = document.getElementById("password-modal");
+const pwModalRoomName  = document.getElementById("pw-modal-room-name");
+const joinPasswordInput= document.getElementById("join-password-input");
+const passwordError    = document.getElementById("password-error");
+const pwModalCancel    = document.getElementById("pw-modal-cancel");
+const pwModalConfirm   = document.getElementById("pw-modal-confirm");
 
-const sidebarToggle = document.getElementById("sidebar-toggle");
-const sidebar       = document.querySelector(".sidebar");
+const toastEl          = document.getElementById("toast");
 
 // ── State ─────────────────────────────────────────────────────
-let myUsername    = "";
-let currentRoom   = "general";
-let socket        = null;
-let typingTimer   = null;
-let isTyping      = false;
-const typingUsers = new Set();
+let socket             = null;
+let myUsername         = "";
+let myAvatarColor      = "#f5a623";
+let myBio              = "";
+let myStatus           = "online";
+let currentRoom        = "general";
+let currentInviteCode  = null;
+let replyingTo         = null;   // { username, text }
+let isPrivateRoom      = false;
+let pendingPrivateRoom = null;
+let isTyping           = false;
+let typingTimer        = null;
+const typingUsers      = new Set();
 
-// Recording state
-let mediaRecorder   = null;
-let audioChunks     = [];
-let recordingStart  = null;
-let recordingInterval = null;
-let pendingPrivateRoom = null; // room name waiting for password
+// Recording
+let mediaRecorder      = null;
+let audioChunks        = [];
+let recordingStart     = null;
+let recordingInterval  = null;
 
-// ── Helpers ──────────────────────────────────────────────────
-function initial(name)  { return name.charAt(0).toUpperCase(); }
-function usernameColor(name) {
-  let hash = 0;
-  for (const ch of name) hash = ch.charCodeAt(0) + ((hash << 5) - hash);
-  return `hsl(${Math.abs(hash) % 360}, 60%, 65%)`;
+// ── Utils ─────────────────────────────────────────────────────
+const initial  = n  => n.charAt(0).toUpperCase();
+const esc      = s  => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#x27;");
+const fmtTime  = s  => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,"0")}`;
+const scrollBot = () => { messagesEl.scrollTop = messagesEl.scrollHeight; };
+
+// ── Toast ──────────────────────────────────────────────────────
+function showToast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.remove("hidden");
+  clearTimeout(toastEl._t);
+  toastEl._t = setTimeout(() => toastEl.classList.add("hidden"), 2400);
 }
-function escapeHTML(str) {
-  return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
-            .replace(/"/g,"&quot;").replace(/'/g,"&#x27;");
-}
-function formatDuration(seconds) {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
-function scrollToBottom() { messagesEl.scrollTop = messagesEl.scrollHeight; }
 
 // ── Join ──────────────────────────────────────────────────────
 function join() {
   const name = usernameInput.value.trim();
   if (!name) {
     usernameInput.style.borderColor = "var(--red)";
-    setTimeout(() => (usernameInput.style.borderColor = ""), 800);
+    setTimeout(() => usernameInput.style.borderColor = "", 800);
     return;
   }
   myUsername = name;
+
+  // Check for invite code in URL hash
+  const hash = window.location.hash.replace("#", "");
+
   socket = io();
-  setupSocketListeners();
-  socket.emit("join", { username: name });
+  setupSocket();
+  socket.emit("join", { username: name, avatarColor: myAvatarColor, bio: myBio });
+
+  // If invite code in URL, join that room after welcome
+  if (hash && hash !== "general" && hash !== "gaming") {
+    socket.once("welcome", () => {
+      setTimeout(() => socket.emit("join_via_invite", { inviteCode: hash }), 300);
+    });
+  }
 }
 
 function showApp() {
   landing.classList.add("hidden");
   app.classList.remove("hidden");
-  myUsernameEl.textContent   = myUsername;
-  myAvatarEl.textContent     = initial(myUsername);
-  myAvatarEl.style.color     = usernameColor(myUsername);
-  myAvatarEl.style.borderColor = usernameColor(myUsername);
+  updateProfileUI();
   msgInput.focus();
 }
 
-// ── Render room list ──────────────────────────────────────────
+// ── Profile UI ────────────────────────────────────────────────
+function updateProfileUI() {
+  panelUsername.textContent  = myUsername;
+  panelAvatar.textContent    = initial(myUsername);
+  panelAvatar.style.color    = myAvatarColor;
+  panelAvatar.style.borderColor = myAvatarColor;
+  bioInput.value             = myBio;
+  bioCharCount.textContent   = `${myBio.length}/100`;
+
+  // Sync active color swatch
+  document.querySelectorAll(".color-swatch").forEach(s => {
+    s.classList.toggle("active", s.dataset.color === myAvatarColor);
+  });
+
+  // Sync active status btn
+  statusBtns.forEach(b => b.classList.toggle("active", b.dataset.status === myStatus));
+}
+
+// ── Render Rooms ──────────────────────────────────────────────
 function renderRooms(rooms) {
   roomListEl.innerHTML = "";
-  rooms.forEach(({ name, count, isPrivate }) => {
+  rooms.forEach(({ name, count, isPrivate, isOwn, inviteCode }) => {
     const li = document.createElement("li");
     li.className = "room-item" + (name === currentRoom ? " active" : "");
-    li.dataset.room = name;
+    li.dataset.room    = name;
     li.dataset.private = isPrivate ? "true" : "false";
+
+    const inviteHtml = (isOwn && inviteCode)
+      ? `<button class="r-invite" data-code="${inviteCode}" title="Copy invite link">🔗 share</button>`
+      : "";
+
     li.innerHTML = `
-      <span class="hash-sign">#</span>
-      <span>${escapeHTML(name)}</span>
-      ${isPrivate ? '<span class="lock-icon">🔒</span>' : ""}
-      <span class="room-count">${count}</span>
+      <span class="r-hash">#</span>
+      <span>${esc(name)}</span>
+      ${isPrivate ? '<span class="r-lock">🔒</span>' : ""}
+      <span class="r-count">${count}</span>
+      ${inviteHtml}
     `;
-    li.addEventListener("click", () => handleRoomClick(name, isPrivate));
+
+    // Room click → switch
+    li.addEventListener("click", (e) => {
+      if (e.target.classList.contains("r-invite")) return;
+      handleRoomClick(name, isPrivate);
+    });
+
+    // Invite button → copy link
+    const inviteButton = li.querySelector(".r-invite");
+    if (inviteButton) {
+      inviteButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const url = `${location.origin}/#${inviteButton.dataset.code}`;
+        navigator.clipboard.writeText(url).then(() => showToast("📋 Invite link copied!"));
+      });
+    }
+
     roomListEl.appendChild(li);
   });
-}
 
-// ── Handle room click (private check) ────────────────────────
-function handleRoomClick(room, isPrivate) {
-  if (room === currentRoom) return;
-  if (isPrivate) {
-    // Show password modal
-    pendingPrivateRoom = room;
-    passwordModalRoomName.textContent = `#${room}`;
-    joinPasswordInput.value = "";
-    passwordError.classList.add("hidden");
-    passwordModal.classList.remove("hidden");
-    joinPasswordInput.focus();
+  // Update header invite btn
+  const myRoom = rooms.find(r => r.name === currentRoom);
+  if (myRoom?.isOwn && myRoom?.inviteCode) {
+    currentInviteCode = myRoom.inviteCode;
+    inviteBtn.classList.remove("hidden");
+  } else if (myRoom?.inviteCode === currentRoom) {
+    // default public room
+    currentInviteCode = currentRoom;
+    inviteBtn.classList.remove("hidden");
   } else {
-    switchRoom(room, "");
+    inviteBtn.classList.add("hidden");
+    currentInviteCode = null;
   }
-  closeSidebar();
 }
 
-// ── Render users ──────────────────────────────────────────────
+// ── Render Users ──────────────────────────────────────────────
 function renderUsers(users) {
   userListEl.innerHTML = "";
-  users.forEach((uname) => {
+  users.forEach(({ username, status, avatarColor }) => {
     const li = document.createElement("li");
     li.className = "user-item";
-    li.innerHTML = `<span class="user-dot"></span><span style="color:${usernameColor(uname)}">${escapeHTML(uname)}</span>`;
+    const color = avatarColor || "#f5a623";
+    li.innerHTML = `
+      <div class="user-item-avatar" style="color:${color}; border: 1.5px solid ${color}40">
+        ${initial(username)}
+        <span class="user-status-badge ${status || "online"}"></span>
+      </div>
+      <span class="user-item-name" style="color:${color}">${esc(username)}</span>
+    `;
     userListEl.appendChild(li);
   });
-  roomMemberCount.textContent = `${users.length} member${users.length !== 1 ? "s" : ""}`;
+  roomMemberCount.textContent = `${users.length} online`;
 }
 
-// ── Append chat message ───────────────────────────────────────
-function appendMessage({ username, text, time }) {
-  const isOwn  = username === myUsername;
-  const color  = usernameColor(username);
-  const div    = document.createElement("div");
-  div.className = "msg" + (isOwn ? " own" : "");
-  div.innerHTML = `
-    <div class="msg-avatar" style="color:${color};border-color:${color}30">${initial(username)}</div>
-    <div class="msg-body">
-      <div class="msg-meta">
-        <span class="msg-author" style="color:${color}">${escapeHTML(username)}</span>
-        <span class="msg-time">${time}</span>
-      </div>
-      <div class="msg-text">${escapeHTML(text)}</div>
-    </div>
-  `;
-  messagesEl.appendChild(div);
-  scrollToBottom();
-}
-
-// ── Append voice note ─────────────────────────────────────────
-function appendVoiceNote({ username, audioData, duration, time }) {
+// ── Append Message ─────────────────────────────────────────────
+function appendMessage({ id, username, avatarColor, text, time, replyTo }) {
   const isOwn = username === myUsername;
-  const color = usernameColor(username);
-  const dur   = Math.round(duration);
+  const color = avatarColor || "#f5a623";
 
   const div = document.createElement("div");
   div.className = "msg" + (isOwn ? " own" : "");
+  div.dataset.id = id || "";
 
-  // Build waveform bars
-  const bars = Array.from({ length: 8 }, () => "<span></span>").join("");
+  const replyHtml = replyTo ? `
+    <div class="msg-reply-quote">
+      <span class="reply-quote-name">${esc(replyTo.username)}</span>
+      <span class="reply-quote-text">${esc(replyTo.text)}</span>
+    </div>
+  ` : "";
 
   div.innerHTML = `
-    <div class="msg-avatar" style="color:${color};border-color:${color}30">${initial(username)}</div>
+    <div class="msg-avatar" style="color:${color}; border-color:${color}40">${initial(username)}</div>
+    <div class="msg-body">
+      ${replyHtml}
+      <div class="msg-meta">
+        <span class="msg-author" style="color:${color}">${esc(username)}</span>
+        <span class="msg-time">${time}</span>
+      </div>
+      <div class="msg-text">${esc(text)}</div>
+    </div>
+    <button class="msg-reply-btn" title="Reply">↩</button>
+  `;
+
+  // Reply button
+  div.querySelector(".msg-reply-btn").addEventListener("click", () => {
+    startReply({ username, text });
+  });
+
+  messagesEl.appendChild(div);
+  scrollBot();
+}
+
+// ── Append Voice Note ──────────────────────────────────────────
+function appendVoiceNote({ username, avatarColor, audioData, duration, time }) {
+  const isOwn = username === myUsername;
+  const color = avatarColor || "#f5a623";
+  const dur   = Math.round(duration);
+  const bars  = Array(8).fill("<span></span>").join("");
+
+  const div = document.createElement("div");
+  div.className = "msg" + (isOwn ? " own" : "");
+  div.innerHTML = `
+    <div class="msg-avatar" style="color:${color}; border-color:${color}40">${initial(username)}</div>
     <div class="msg-body">
       <div class="msg-meta">
-        <span class="msg-author" style="color:${color}">${escapeHTML(username)}</span>
+        <span class="msg-author" style="color:${color}">${esc(username)}</span>
         <span class="msg-time">${time}</span>
       </div>
       <div class="voice-note-player">
-        <button class="voice-play-btn" aria-label="Play voice note">▶</button>
+        <button class="voice-play-btn">▶</button>
         <div class="voice-waveform">${bars}</div>
-        <span class="voice-duration">${formatDuration(dur)}</span>
+        <span class="voice-duration">${fmtTime(dur)}</span>
       </div>
     </div>
   `;
 
-  // Create audio element from base64
   const audio    = new Audio(audioData);
   const playBtn  = div.querySelector(".voice-play-btn");
   const waveform = div.querySelector(".voice-waveform");
@@ -208,50 +292,68 @@ function appendVoiceNote({ username, audioData, duration, time }) {
   playBtn.addEventListener("click", () => {
     if (audio.paused) {
       audio.play();
-      playBtn.textContent = "⏸";
-      playBtn.classList.add("playing");
+      playBtn.textContent = "⏸"; playBtn.classList.add("playing");
       waveform.classList.add("playing");
     } else {
-      audio.pause();
-      audio.currentTime = 0;
-      playBtn.textContent = "▶";
-      playBtn.classList.remove("playing");
+      audio.pause(); audio.currentTime = 0;
+      playBtn.textContent = "▶"; playBtn.classList.remove("playing");
       waveform.classList.remove("playing");
     }
   });
-
   audio.addEventListener("ended", () => {
-    playBtn.textContent = "▶";
-    playBtn.classList.remove("playing");
+    playBtn.textContent = "▶"; playBtn.classList.remove("playing");
     waveform.classList.remove("playing");
   });
 
   messagesEl.appendChild(div);
-  scrollToBottom();
+  scrollBot();
 }
 
-// ── Append notification ───────────────────────────────────────
+// ── Append Notification ────────────────────────────────────────
 function appendNotification({ text, type }) {
   const div = document.createElement("div");
   div.className = "msg notification";
-  div.innerHTML = `<span class="notification-text ${type}">${escapeHTML(text)}</span>`;
+  div.innerHTML = `<span class="notification-text ${type}">${esc(text)}</span>`;
   messagesEl.appendChild(div);
-  scrollToBottom();
+  scrollBot();
 }
 
-// ── Send message ──────────────────────────────────────────────
+// ── Reply system ───────────────────────────────────────────────
+function startReply({ username, text }) {
+  replyingTo = { username, text };
+  replyBarName.textContent = username;
+  replyBarText.textContent = text.slice(0, 60) + (text.length > 60 ? "…" : "");
+  replyBar.classList.remove("hidden");
+  msgInput.focus();
+}
+function cancelReply() {
+  replyingTo = null;
+  replyBar.classList.add("hidden");
+}
+
+// ── Send Message ───────────────────────────────────────────────
 function sendMessage() {
   const text = msgInput.value.trim();
   if (!text || !socket) return;
-  socket.emit("message", { text });
+  socket.emit("message", { text, replyTo: replyingTo });
   msgInput.value = "";
+  cancelReply();
   handleTypingStop();
 }
 
-// ── Switch room ───────────────────────────────────────────────
-function switchRoom(room, password) {
-  if (room === currentRoom || !socket) return;
-  socket.emit("switch_room", { room, password: password || "" });
+// ── Room handling ──────────────────────────────────────────────
+function handleRoomClick(room, isPrivate) {
+  if (room === currentRoom) return;
+  if (isPrivate) {
+    pendingPrivateRoom = room;
+    pwModalRoomName.textContent = `#${room}`;
+    joinPasswordInput.value = "";
+    passwordError.classList.add("hidden");
+    passwordModal.classList.remove("hidden");
+    joinPasswordInput.focus();
+  } else {
+    socket.emit("switch_room", { room, password: "" });
+  }
 }
 
 // ── Typing ────────────────────────────────────────────────────
@@ -264,238 +366,216 @@ function handleTypingStop() {
   if (isTyping) { isTyping = false; socket?.emit("typing", { isTyping: false }); }
   clearTimeout(typingTimer);
 }
-function updateTypingIndicator() {
-  if (typingUsers.size === 0) { typingIndicator.innerHTML = ""; return; }
+function updateTypingUI() {
+  if (!typingUsers.size) { typingIndicator.innerHTML = ""; return; }
   const names = [...typingUsers];
   const label = names.length === 1 ? `${names[0]} is typing`
-    : names.length === 2 ? `${names[0]} and ${names[1]} are typing`
-    : `several people are typing`;
-  typingIndicator.innerHTML = `<div class="typing-dots"><span></span><span></span><span></span></div>${escapeHTML(label)}…`;
+    : names.length === 2 ? `${names[0]} & ${names[1]} are typing`
+    : "several people are typing";
+  typingIndicator.innerHTML = `<div class="typing-dots"><span></span><span></span><span></span></div>${esc(label)}…`;
 }
 
-// ══════════════════════════════════════════════════════════════
-//  VOICE RECORDING
-// ══════════════════════════════════════════════════════════════
-
+// ── Voice Recording ────────────────────────────────────────────
 async function startRecording() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     audioChunks  = [];
     mediaRecorder = new MediaRecorder(stream);
     recordingStart = Date.now();
-
-    mediaRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) audioChunks.push(e.data);
-    };
-
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
     mediaRecorder.onstop = () => {
-      const duration = (Date.now() - recordingStart) / 1000;
-      const blob     = new Blob(audioChunks, { type: "audio/webm" });
-
-      // Convert blob to base64
+      const dur  = (Date.now() - recordingStart) / 1000;
+      const blob = new Blob(audioChunks, { type: "audio/webm" });
       const reader = new FileReader();
       reader.onloadend = () => {
-        const base64 = reader.result; // data:audio/webm;base64,...
-        if (socket && duration > 0.5) { // only send if > 0.5s
-          socket.emit("voice_note", { audioData: base64, duration });
-        }
+        if (socket && dur > 0.5) socket.emit("voice_note", { audioData: reader.result, duration: dur });
       };
       reader.readAsDataURL(blob);
-
-      // Stop all tracks
-      stream.getTracks().forEach((t) => t.stop());
+      stream.getTracks().forEach(t => t.stop());
     };
-
     mediaRecorder.start();
     micBtn.classList.add("recording");
     recordingOverlay.classList.remove("hidden");
-
-    // Update timer every second
     recordingInterval = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - recordingStart) / 1000);
-      recordingTimer.textContent = formatDuration(elapsed);
+      const e = Math.floor((Date.now() - recordingStart) / 1000);
+      recordingTimer.textContent = fmtTime(e);
     }, 1000);
-
-  } catch (err) {
-    console.error("Mic access denied:", err);
-    appendNotification({ text: "Microphone access denied 🎤❌", type: "leave" });
+  } catch {
+    appendNotification({ text: "Mic access denied 🎤❌", type: "leave" });
   }
 }
-
 function stopRecording() {
-  if (mediaRecorder && mediaRecorder.state !== "inactive") {
-    mediaRecorder.stop();
-  }
+  if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
   micBtn.classList.remove("recording");
   recordingOverlay.classList.add("hidden");
   clearInterval(recordingInterval);
   recordingTimer.textContent = "0:00";
 }
 
-// ── Mic button: hold to record (mouse + touch) ────────────────
-micBtn.addEventListener("mousedown",  (e) => { e.preventDefault(); startRecording(); });
-micBtn.addEventListener("mouseup",    stopRecording);
-micBtn.addEventListener("mouseleave", stopRecording);
-micBtn.addEventListener("touchstart", (e) => { e.preventDefault(); startRecording(); }, { passive: false });
-micBtn.addEventListener("touchend",   stopRecording);
-
-// ══════════════════════════════════════════════════════════════
-//  CREATE ROOM MODAL
-// ══════════════════════════════════════════════════════════════
-
-let isPrivateRoom = false;
-
-function openCreateModal() {
-  modal.classList.remove("hidden");
-  newRoomInput.value = "";
-  roomPasswordInput.value = "";
-  isPrivateRoom = false;
-  togglePublic.classList.add("active");
-  togglePrivate.classList.remove("active");
-  passwordWrap.classList.add("hidden");
-  newRoomInput.focus();
-}
-function closeCreateModal() { modal.classList.add("hidden"); }
-
-function confirmCreateRoom() {
-  const name = newRoomInput.value.trim();
-  if (!name || !socket) return;
-  const password = isPrivateRoom ? roomPasswordInput.value.trim() : "";
-  socket.emit("create_room", { room: name, isPrivate: isPrivateRoom, password });
-  closeCreateModal();
-}
-
-togglePublic.addEventListener("click", () => {
-  isPrivateRoom = false;
-  togglePublic.classList.add("active");
-  togglePrivate.classList.remove("active");
-  passwordWrap.classList.add("hidden");
-});
-togglePrivate.addEventListener("click", () => {
-  isPrivateRoom = true;
-  togglePrivate.classList.add("active");
-  togglePublic.classList.remove("active");
-  passwordWrap.classList.remove("hidden");
-  roomPasswordInput.focus();
-});
-
-createRoomBtn.addEventListener("click", openCreateModal);
-modalCancel.addEventListener("click", closeCreateModal);
-modalConfirm.addEventListener("click", confirmCreateRoom);
-newRoomInput.addEventListener("keydown", (e) => { if (e.key === "Enter") confirmCreateRoom(); if (e.key === "Escape") closeCreateModal(); });
-modal.addEventListener("click", (e) => { if (e.target === modal) closeCreateModal(); });
-
-// ══════════════════════════════════════════════════════════════
-//  PASSWORD MODAL (join private room)
-// ══════════════════════════════════════════════════════════════
-
-function closePasswordModal() {
-  passwordModal.classList.add("hidden");
-  pendingPrivateRoom = null;
-}
-
-function confirmJoinPrivate() {
-  if (!pendingPrivateRoom) return;
-  const pw = joinPasswordInput.value;
-  switchRoom(pendingPrivateRoom, pw);
-  passwordModal.classList.add("hidden");
-  // Don't clear pendingPrivateRoom yet — wait for error or success
-}
-
-passwordModalCancel.addEventListener("click", closePasswordModal);
-passwordModalConfirm.addEventListener("click", confirmJoinPrivate);
-joinPasswordInput.addEventListener("keydown", (e) => { if (e.key === "Enter") confirmJoinPrivate(); if (e.key === "Escape") closePasswordModal(); });
-passwordModal.addEventListener("click", (e) => { if (e.target === passwordModal) closePasswordModal(); });
-
 // ══════════════════════════════════════════════════════════════
 //  SOCKET LISTENERS
 // ══════════════════════════════════════════════════════════════
-function setupSocketListeners() {
+function setupSocket() {
 
-  socket.on("welcome", ({ username, room, rooms, usersInRoom }) => {
-    myUsername  = username;
-    currentRoom = room;
+  socket.on("welcome", ({ username, room, rooms, usersInRoom, avatarColor, bio }) => {
+    myUsername    = username;
+    myAvatarColor = avatarColor || myAvatarColor;
+    myBio         = bio || "";
+    currentRoom   = room;
     showApp();
     renderRooms(rooms);
     renderUsers(usersInRoom);
-    currentRoomName.textContent = currentRoom;
+    currentRoomName.textContent = room;
     appendNotification({ text: `Welcome to #${room}! 🎉`, type: "info" });
   });
 
-  socket.on("message", (payload) => appendMessage(payload));
-
-  socket.on("voice_note", (payload) => appendVoiceNote(payload));
-
-  socket.on("notification", (payload) => appendNotification(payload));
-
-  socket.on("room_list", (rooms) => renderRooms(rooms));
-
-  socket.on("users_in_room", (users) => renderUsers(users));
+  socket.on("message",    p => appendMessage(p));
+  socket.on("voice_note", p => appendVoiceNote(p));
+  socket.on("notification", p => appendNotification(p));
+  socket.on("room_list",    r => renderRooms(r));
+  socket.on("users_in_room", u => renderUsers(u));
 
   socket.on("room_switched", ({ room, usersInRoom }) => {
     currentRoom = room;
     currentRoomName.textContent = room;
     pendingPrivateRoom = null;
     passwordError.classList.add("hidden");
+    passwordModal.classList.add("hidden");
     messagesEl.innerHTML = "";
-    typingUsers.clear();
-    updateTypingIndicator();
+    typingUsers.clear(); updateTypingUI();
     renderUsers(usersInRoom);
-    appendNotification({ text: `You joined #${room}`, type: "info" });
+    appendNotification({ text: `Switched to #${room}`, type: "info" });
 
-    // Show lock icon if private
-    const roomItem = roomListEl.querySelector(`[data-room="${room}"]`);
-    if (roomItem?.dataset.private === "true") {
-      roomLockIcon.classList.remove("hidden");
-    } else {
-      roomLockIcon.classList.add("hidden");
-    }
+    // Lock icon
+    const item = roomListEl.querySelector(`[data-room="${room}"]`);
+    roomLockIcon.classList.toggle("hidden", item?.dataset.private !== "true");
   });
 
   socket.on("room_error", ({ message }) => {
-    // Wrong password
     passwordError.textContent = message;
     passwordError.classList.remove("hidden");
     joinPasswordInput.value = "";
     joinPasswordInput.focus();
-    passwordModal.classList.remove("hidden"); // re-show if dismissed
+    passwordModal.classList.remove("hidden");
   });
 
   socket.on("switch_room_request", ({ room, password }) => {
     socket.emit("switch_room", { room, password: password || "" });
   });
 
-  socket.on("typing", ({ username, isTyping: typing }) => {
-    if (typing) typingUsers.add(username); else typingUsers.delete(username);
-    updateTypingIndicator();
+  socket.on("profile_updated", ({ bio, avatarColor, status }) => {
+    myBio = bio; myAvatarColor = avatarColor; myStatus = status;
+    updateProfileUI();
   });
 
-  socket.on("disconnect", () => appendNotification({ text: "Disconnected. Reconnecting…", type: "leave" }));
-
-  socket.on("connect", () => {
-    if (myUsername) socket.emit("join", { username: myUsername });
+  socket.on("typing", ({ username, isTyping: t }) => {
+    if (t) typingUsers.add(username); else typingUsers.delete(username);
+    updateTypingUI();
   });
+
+  socket.on("disconnect", () => appendNotification({ text: "Disconnected… reconnecting", type: "leave" }));
+  socket.on("connect",    () => { if (myUsername) socket.emit("join", { username: myUsername, avatarColor: myAvatarColor, bio: myBio }); });
 }
 
 // ══════════════════════════════════════════════════════════════
-//  BASIC EVENT LISTENERS
+//  DOM EVENT LISTENERS
 // ══════════════════════════════════════════════════════════════
 
+// Landing
 joinBtn.addEventListener("click", join);
-usernameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") join(); });
+usernameInput.addEventListener("keydown", e => { if (e.key === "Enter") join(); });
 
+// Chat
 sendBtn.addEventListener("click", sendMessage);
-msgInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-});
-msgInput.addEventListener("input", () => {
-  if (msgInput.value.trim()) handleTypingStart(); else handleTypingStop();
+msgInput.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } });
+msgInput.addEventListener("input", () => { msgInput.value.trim() ? handleTypingStart() : handleTypingStop(); });
+replyCancel.addEventListener("click", cancelReply);
+
+// Invite btn (header)
+inviteBtn.addEventListener("click", () => {
+  if (!currentInviteCode) return;
+  const url = `${location.origin}/#${currentInviteCode}`;
+  navigator.clipboard.writeText(url).then(() => showToast("📋 Invite link copied!"));
 });
 
-sidebarToggle.addEventListener("click", toggleSidebar);
-app.addEventListener("click", (e) => {
-  if (sidebar.classList.contains("open") && !sidebar.contains(e.target) && e.target !== sidebarToggle) closeSidebar();
+// Panel toggle (mobile)
+panelToggle.addEventListener("click", () => rightPanel.classList.toggle("open"));
+
+// ── Profile ──────────────────────────────────────────────────
+bioInput.addEventListener("input", () => {
+  bioCharCount.textContent = `${bioInput.value.length}/100`;
+});
+saveBioBtn.addEventListener("click", () => {
+  myBio = bioInput.value.trim();
+  socket?.emit("update_profile", { bio: myBio, avatarColor: myAvatarColor, status: myStatus });
+  showToast("✅ Bio saved!");
 });
 
-function toggleSidebar() { sidebar.classList.toggle("open"); }
-function closeSidebar()  { sidebar.classList.remove("open"); }
+// Avatar color
+colorGrid.addEventListener("click", e => {
+  const swatch = e.target.closest(".color-swatch");
+  if (!swatch) return;
+  myAvatarColor = swatch.dataset.color;
+  socket?.emit("update_profile", { bio: myBio, avatarColor: myAvatarColor, status: myStatus });
+  updateProfileUI();
+  showToast("🎨 Color updated!");
+});
+
+// Status buttons
+statusBtns.forEach(btn => {
+  btn.addEventListener("click", () => {
+    myStatus = btn.dataset.status;
+    socket?.emit("update_profile", { bio: myBio, avatarColor: myAvatarColor, status: myStatus });
+    statusBtns.forEach(b => b.classList.toggle("active", b === btn));
+    showToast(`Status: ${myStatus}`);
+  });
+});
+
+// ── Mic ──────────────────────────────────────────────────────
+micBtn.addEventListener("mousedown",  e => { e.preventDefault(); startRecording(); });
+micBtn.addEventListener("mouseup",    stopRecording);
+micBtn.addEventListener("mouseleave", stopRecording);
+micBtn.addEventListener("touchstart", e => { e.preventDefault(); startRecording(); }, { passive: false });
+micBtn.addEventListener("touchend",   stopRecording);
+
+// ── Create Room Modal ─────────────────────────────────────────
+createRoomBtn.addEventListener("click", () => {
+  newRoomInput.value = ""; roomPasswordInput.value = "";
+  isPrivateRoom = false;
+  togglePublic.classList.add("active"); togglePrivate.classList.remove("active");
+  passwordWrap.classList.add("hidden");
+  createModal.classList.remove("hidden"); newRoomInput.focus();
+});
+modalCancel.addEventListener("click",  () => createModal.classList.add("hidden"));
+createModal.addEventListener("click",  e => { if (e.target === createModal) createModal.classList.add("hidden"); });
+
+togglePublic.addEventListener("click", () => {
+  isPrivateRoom = false;
+  togglePublic.classList.add("active"); togglePrivate.classList.remove("active");
+  passwordWrap.classList.add("hidden");
+});
+togglePrivate.addEventListener("click", () => {
+  isPrivateRoom = true;
+  togglePrivate.classList.add("active"); togglePublic.classList.remove("active");
+  passwordWrap.classList.remove("hidden"); roomPasswordInput.focus();
+});
+
+function confirmCreateRoom() {
+  const name = newRoomInput.value.trim();
+  if (!name || !socket) return;
+  socket.emit("create_room", { room: name, isPrivate: isPrivateRoom, password: isPrivateRoom ? roomPasswordInput.value.trim() : "" });
+  createModal.classList.add("hidden");
+}
+modalConfirm.addEventListener("click", confirmCreateRoom);
+newRoomInput.addEventListener("keydown", e => { if (e.key === "Enter") confirmCreateRoom(); if (e.key === "Escape") createModal.classList.add("hidden"); });
+
+// ── Password Modal ────────────────────────────────────────────
+pwModalCancel.addEventListener("click",  () => { passwordModal.classList.add("hidden"); pendingPrivateRoom = null; });
+passwordModal.addEventListener("click",  e => { if (e.target === passwordModal) { passwordModal.classList.add("hidden"); pendingPrivateRoom = null; } });
+
+function confirmJoinPrivate() {
+  if (!pendingPrivateRoom) return;
+  socket.emit("switch_room", { room: pendingPrivateRoom, password: joinPasswordInput.value });
+}
+pwModalConfirm.addEventListener("click", confirmJoinPrivate);
+joinPasswordInput.addEventListener("keydown", e => { if (e.key === "Enter") confirmJoinPrivate(); if (e.key === "Escape") { passwordModal.classList.add("hidden"); pendingPrivateRoom = null; } });
