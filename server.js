@@ -1,167 +1,217 @@
 // ============================================================
-//  ChillSpace v2 — Server
-//  New: Voice notes, Private rooms with password, No music room
+//  ChillSpace v3 — Server
+//  New: Message replies, Private rooms (creator only),
+//       Invite links, Online/Busy/Offline status, Profile
 // ============================================================
 
 const express = require("express");
-const http = require("http");
+const http    = require("http");
 const { Server } = require("socket.io");
-const path = require("path");
+const path    = require("path");
 
-const app = express();
+const app    = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  maxHttpBufferSize: 5e6 // 5MB max for voice notes
-});
-
-const PORT = process.env.PORT || 3000;
+const io     = new Server(server, { maxHttpBufferSize: 5e6 });
+const PORT   = process.env.PORT || 3000;
 
 app.use(express.static(path.join(__dirname, "public")));
 
 // ── In-memory state ──────────────────────────────────────────
 
-// Map of socketId → { username, room }
+// socketId → { username, room, status, bio, avatarColor, createdRooms[] }
 const users = {};
 
-// Map of roomName → { members: Set, isPrivate: bool, password: string, createdBy: string }
+// roomName → { members: Set, isPrivate, password, createdBy, inviteCode }
 const rooms = {
-  "general": { members: new Set(), isPrivate: false, password: "", createdBy: "system" },
-  "gaming":  { members: new Set(), isPrivate: false, password: "", createdBy: "system" },
+  general: { members: new Set(), isPrivate: false, password: "", createdBy: "system", inviteCode: "general" },
+  gaming:  { members: new Set(), isPrivate: false, password: "", createdBy: "system", inviteCode: "gaming"  },
+};
+
+// inviteCode → roomName
+const inviteCodes = {
+  general: "general",
+  gaming:  "gaming",
 };
 
 // ── Helpers ──────────────────────────────────────────────────
 
-/** Room list — only show public rooms + rooms the user is in */
-function getRoomListForUser(socketId) {
-  const user = users[socketId];
-  return Object.entries(rooms).map(([name, data]) => ({
-    name,
-    count: data.members.size,
-    isPrivate: data.isPrivate,
-    // user can see private room if they're already in it
-    isMember: user?.room === name,
-  }));
+function generateCode() {
+  return Math.random().toString(36).substring(2, 8);
 }
 
-/** Public room list for everyone */
-function getPublicRoomList() {
-  return Object.entries(rooms).map(([name, data]) => ({
-    name,
-    count: data.members.size,
-    isPrivate: data.isPrivate,
-  }));
+// Rooms visible to a specific socket:
+// - Default public rooms (general, gaming)
+// - Public rooms created by anyone
+// - Private rooms created BY this user
+function getRoomsForSocket(socketId) {
+  const user = users[socketId];
+  return Object.entries(rooms).map(([name, data]) => {
+    const isOwn    = data.createdBy === user?.username;
+    const isSystem = data.createdBy === "system";
+    const visible  = !data.isPrivate || isOwn || isSystem;
+    return {
+      name,
+      count:     data.members.size,
+      isPrivate: data.isPrivate,
+      isOwn,
+      inviteCode: (isOwn || isSystem) ? data.inviteCode : null,
+      visible,
+    };
+  }).filter(r => r.visible);
 }
 
 function getUsersInRoom(room) {
   return Object.values(users)
-    .filter((u) => u.room === room)
-    .map((u) => u.username);
+    .filter(u => u.room === room)
+    .map(u => ({
+      username:    u.username,
+      status:      u.status,
+      avatarColor: u.avatarColor,
+    }));
 }
 
-function broadcastRooms() {
-  // Send each socket a room list
-  Object.keys(users).forEach((sid) => {
-    const socket = io.sockets.sockets.get(sid);
-    if (socket) socket.emit("room_list", getRoomListForUser(sid));
+function broadcastRoomLists() {
+  Object.keys(users).forEach(sid => {
+    const s = io.sockets.sockets.get(sid);
+    if (s) s.emit("room_list", getRoomsForSocket(sid));
   });
-  // Also broadcast to anyone not yet in users map
-  io.emit("room_list_public", getPublicRoomList());
 }
 
-// ── Socket.IO events ─────────────────────────────────────────
-io.on("connection", (socket) => {
+// ── Socket events ─────────────────────────────────────────────
+io.on("connection", socket => {
 
-  // ── 1. Join ──────────────────────────────────────────────
-  socket.on("join", ({ username }) => {
-    const name = username.trim().slice(0, 24) || "Anonymous";
+  // 1. JOIN
+  socket.on("join", ({ username, avatarColor, bio }) => {
+    const name = (username || "").trim().slice(0, 24) || "Anonymous";
     const room = "general";
 
-    users[socket.id] = { username: name, room };
+    users[socket.id] = {
+      username:    name,
+      room,
+      status:      "online",
+      bio:         bio || "",
+      avatarColor: avatarColor || "#f5a623",
+      createdRooms: [],
+    };
+
     socket.join(room);
     rooms[room].members.add(socket.id);
 
-    console.log(`[+] ${name} connected → #${room}`);
-
     socket.emit("welcome", {
-      username: name,
+      username:    name,
       room,
-      rooms: getRoomListForUser(socket.id),
+      rooms:       getRoomsForSocket(socket.id),
       usersInRoom: getUsersInRoom(room),
+      avatarColor: users[socket.id].avatarColor,
+      bio:         users[socket.id].bio,
     });
 
-    socket.to(room).emit("notification", { text: `${name} joined #${room} 👋`, type: "join" });
+    socket.to(room).emit("notification", { text: `${name} joined 👋`, type: "join" });
     io.to(room).emit("users_in_room", getUsersInRoom(room));
-    broadcastRooms();
+    broadcastRoomLists();
   });
 
-  // ── 2. Chat message ──────────────────────────────────────
-  socket.on("message", ({ text }) => {
+  // 2. CHAT MESSAGE (with optional reply)
+  socket.on("message", ({ text, replyTo }) => {
     const user = users[socket.id];
     if (!user) return;
     const clean = text.trim();
     if (!clean) return;
 
     io.to(user.room).emit("message", {
-      username: user.username,
-      text: clean,
-      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      id:          Date.now() + socket.id,
+      username:    user.username,
+      avatarColor: user.avatarColor,
+      text:        clean,
+      time:        new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      replyTo:     replyTo || null, // { username, text }
     });
   });
 
-  // ── 3. Voice note ────────────────────────────────────────
+  // 3. VOICE NOTE
   socket.on("voice_note", ({ audioData, duration }) => {
     const user = users[socket.id];
     if (!user || !audioData) return;
-
-    // Broadcast audio to everyone in the room (including sender)
     io.to(user.room).emit("voice_note", {
-      username: user.username,
-      audioData, // base64 encoded audio
-      duration: duration || 0,
-      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      username:    user.username,
+      avatarColor: user.avatarColor,
+      audioData,
+      duration:    duration || 0,
+      time:        new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     });
-
-    console.log(`[voice] #${user.room} | ${user.username} sent a voice note`);
   });
 
-  // ── 4. Switch room ───────────────────────────────────────
+  // 4. UPDATE PROFILE
+  socket.on("update_profile", ({ bio, avatarColor, status }) => {
+    const user = users[socket.id];
+    if (!user) return;
+    if (bio         !== undefined) user.bio         = bio.slice(0, 100);
+    if (avatarColor !== undefined) user.avatarColor = avatarColor;
+    if (status      !== undefined) user.status      = status;
+
+    // Notify room of status/profile change
+    io.to(user.room).emit("users_in_room", getUsersInRoom(user.room));
+    socket.emit("profile_updated", { bio: user.bio, avatarColor: user.avatarColor, status: user.status });
+  });
+
+  // 5. SWITCH ROOM
   socket.on("switch_room", ({ room: newRoom, password }) => {
     const user = users[socket.id];
     if (!user || !rooms[newRoom]) return;
 
     const roomData = rooms[newRoom];
-
-    // Check password for private rooms
-    if (roomData.isPrivate && roomData.password !== password) {
-      socket.emit("room_error", { message: "Wrong password! 🔒" });
-      return;
+    if (roomData.isPrivate && roomData.createdBy !== user.username) {
+      if (roomData.password !== password) {
+        socket.emit("room_error", { message: "Wrong password 🔒" });
+        return;
+      }
     }
 
     const oldRoom = user.room;
     if (oldRoom === newRoom) return;
 
-    // Leave old room
     socket.leave(oldRoom);
     rooms[oldRoom].members.delete(socket.id);
-    socket.to(oldRoom).emit("notification", { text: `${user.username} left #${oldRoom}`, type: "leave" });
+    socket.to(oldRoom).emit("notification", { text: `${user.username} left`, type: "leave" });
     io.to(oldRoom).emit("users_in_room", getUsersInRoom(oldRoom));
 
-    // Join new room
     user.room = newRoom;
     socket.join(newRoom);
     roomData.members.add(socket.id);
-    socket.to(newRoom).emit("notification", { text: `${user.username} joined #${newRoom} 👋`, type: "join" });
+    socket.to(newRoom).emit("notification", { text: `${user.username} joined 👋`, type: "join" });
 
-    socket.emit("room_switched", {
-      room: newRoom,
-      usersInRoom: getUsersInRoom(newRoom),
-    });
-
+    socket.emit("room_switched", { room: newRoom, usersInRoom: getUsersInRoom(newRoom) });
     io.to(newRoom).emit("users_in_room", getUsersInRoom(newRoom));
-    broadcastRooms();
+    broadcastRoomLists();
   });
 
-  // ── 5. Create room ───────────────────────────────────────
+  // 6. JOIN VIA INVITE CODE
+  socket.on("join_via_invite", ({ inviteCode }) => {
+    const roomName = inviteCodes[inviteCode];
+    if (!roomName) { socket.emit("room_error", { message: "Invalid invite link 😕" }); return; }
+    const roomData = rooms[roomName];
+    // For private rooms via invite, no password needed
+    const user = users[socket.id];
+    if (!user) return;
+
+    const oldRoom = user.room;
+    if (oldRoom === roomName) return;
+
+    socket.leave(oldRoom);
+    rooms[oldRoom].members.delete(socket.id);
+    socket.to(oldRoom).emit("notification", { text: `${user.username} left`, type: "leave" });
+    io.to(oldRoom).emit("users_in_room", getUsersInRoom(oldRoom));
+
+    user.room = roomName;
+    socket.join(roomName);
+    roomData.members.add(socket.id);
+    socket.to(roomName).emit("notification", { text: `${user.username} joined via invite 👋`, type: "join" });
+    socket.emit("room_switched", { room: roomName, usersInRoom: getUsersInRoom(roomName) });
+    io.to(roomName).emit("users_in_room", getUsersInRoom(roomName));
+    broadcastRoomLists();
+  });
+
+  // 7. CREATE ROOM
   socket.on("create_room", ({ room: newRoom, isPrivate, password }) => {
     const user = users[socket.id];
     if (!user) return;
@@ -169,47 +219,42 @@ io.on("connection", (socket) => {
     const name = newRoom.trim().toLowerCase().replace(/\s+/g, "-").slice(0, 20);
     if (!name) return;
 
+    const inviteCode = generateCode();
+
     if (!rooms[name]) {
       rooms[name] = {
-        members: new Set(),
-        isPrivate: !!isPrivate,
-        password: isPrivate ? (password || "") : "",
-        createdBy: user.username,
+        members:    new Set(),
+        isPrivate:  !!isPrivate,
+        password:   isPrivate ? (password || "") : "",
+        createdBy:  user.username,
+        inviteCode,
       };
-
-      const visibility = isPrivate ? "🔒 private" : "🌐 public";
-      io.emit("notification", { text: `#${name} was created (${visibility}) 🎉`, type: "info" });
-      console.log(`[room] #${name} created by ${user.username} | private: ${!!isPrivate}`);
+      inviteCodes[inviteCode] = name;
+      console.log(`[room] #${name} by ${user.username} | private:${!!isPrivate} | code:${inviteCode}`);
     }
 
-    broadcastRooms();
+    broadcastRoomLists();
     socket.emit("switch_room_request", { room: name, password: isPrivate ? password : "" });
   });
 
-  // ── 6. Typing ────────────────────────────────────────────
+  // 8. TYPING
   socket.on("typing", ({ isTyping }) => {
     const user = users[socket.id];
     if (!user) return;
     socket.to(user.room).emit("typing", { username: user.username, isTyping });
   });
 
-  // ── 7. Disconnect ────────────────────────────────────────
+  // 9. DISCONNECT
   socket.on("disconnect", () => {
     const user = users[socket.id];
     if (!user) return;
-
     const { username, room } = user;
     rooms[room]?.members.delete(socket.id);
     delete users[socket.id];
-
-    socket.to(room).emit("notification", { text: `${username} left the space`, type: "leave" });
+    socket.to(room).emit("notification", { text: `${username} left`, type: "leave" });
     io.to(room).emit("users_in_room", getUsersInRoom(room));
-    broadcastRooms();
-
-    console.log(`[-] ${username} disconnected`);
+    broadcastRoomLists();
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`✅  ChillSpace v2 running → http://localhost:${PORT}`);
-});
+server.listen(PORT, () => console.log(`✅ ChillSpace v3 → http://localhost:${PORT}`));
