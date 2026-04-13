@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ChillSpace 🌙</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ══════════════════════════════════════════════
+       LANDING / USERNAME SCREEN
+  ══════════════════════════════════════════════ -->
+  <div id="landing" class="landing">
+    <div class="landing-card">
+      <div class="logo-mark">◈</div>
+      <h1 class="landing-title">Chill<span>Space</span></h1>
+      <p class="landing-sub">your tiny corner of the internet</p>
+      <div class="input-wrap">
+        <input
+          id="username-input"
+          type="text"
+          placeholder="what do your friends call you?"
+          maxlength="24"
+          autocomplete="off"
+        />
+        <button id="join-btn">enter →</button>
+      </div>
+      <p class="landing-hint">no signup · no tracking · just vibes</p>
+    </div>
+    <!-- decorative blobs -->
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       MAIN APP
+  ══════════════════════════════════════════════ -->
+  <div id="app" class="app hidden">
+
+    <!-- ── Sidebar ── -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <span class="logo-mark-sm">◈</span>
+        <span class="sidebar-title">ChillSpace</span>
+      </div>
+
+      <!-- Rooms list -->
+      <div class="sidebar-section">
+        <div class="sidebar-label">ROOMS</div>
+        <ul id="room-list" class="room-list"></ul>
+        <button id="create-room-btn" class="create-room-btn">＋ new room</button>
+      </div>
+
+      <!-- Online users -->
+      <div class="sidebar-section sidebar-users-section">
+        <div class="sidebar-label">ONLINE NOW</div>
+        <ul id="user-list" class="user-list"></ul>
+      </div>
+
+      <!-- Current user badge -->
+      <div class="sidebar-footer">
+        <div class="my-avatar" id="my-avatar">?</div>
+        <span id="my-username" class="my-name">—</span>
+      </div>
+    </aside>
+
+    <!-- ── Main chat area ── -->
+    <main class="chat-area">
+
+      <!-- Header -->
+      <header class="chat-header">
+        <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle sidebar">☰</button>
+        <span class="hash">#</span>
+        <span id="current-room-name" class="current-room">general</span>
+        <span id="room-member-count" class="member-count"></span>
+      </header>
+
+      <!-- Messages -->
+      <div id="messages" class="messages"></div>
+
+      <!-- Typing indicator -->
+      <div id="typing-indicator" class="typing-indicator"></div>
+
+      <!-- Input bar -->
+      <div class="input-bar">
+        <input
+          id="msg-input"
+          type="text"
+          placeholder="say something…"
+          maxlength="500"
+          autocomplete="off"
+        />
+        <button id="send-btn" class="send-btn" aria-label="Send">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Modal: create room -->
+  <div id="create-room-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <h2 class="modal-title">create a room</h2>
+      <input id="new-room-input" type="text" placeholder="room name (e.g. lofi-beats)" maxlength="20" autocomplete="off"/>
+      <div class="modal-actions">
+        <button id="modal-cancel" class="modal-btn cancel">cancel</button>
+        <button id="modal-confirm" class="modal-btn confirm">create →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Socket.IO client (served automatically by the server) -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
