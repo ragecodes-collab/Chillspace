@@ -1,156 +1,203 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>ChillSpace 🌙</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
 
-  <!-- ══════════════════════════════════════════════
-       LANDING SCREEN
-  ══════════════════════════════════════════════ -->
-  <div id="landing" class="landing">
-    <div class="landing-card">
-      <div class="logo-mark">◈</div>
-      <h1 class="landing-title">Chill<span>Space</span></h1>
-      <p class="landing-sub">your tiny corner of the internet</p>
-      <div class="input-wrap">
-        <input id="username-input" type="text" placeholder="what do your friends call you?" maxlength="24" autocomplete="off"/>
-        <button id="join-btn">enter →</button>
-      </div>
-      <p class="landing-hint">no signup · no tracking · just vibes</p>
+<!-- ══════════════════════════ LANDING ══════════════════════════ -->
+<div id="landing" class="landing">
+  <div class="landing-card">
+    <div class="logo-mark">◈</div>
+    <h1 class="landing-title">Chill<span>Space</span></h1>
+    <p class="landing-sub">your tiny corner of the internet</p>
+    <div class="input-wrap">
+      <input id="username-input" type="text" placeholder="what do your friends call you?" maxlength="24" autocomplete="off"/>
+      <button id="join-btn">enter →</button>
     </div>
-    <div class="blob blob-1"></div>
-    <div class="blob blob-2"></div>
-    <div class="blob blob-3"></div>
+    <p class="landing-hint">no signup · no tracking · just vibes</p>
   </div>
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+</div>
 
-  <!-- ══════════════════════════════════════════════
-       MAIN APP
-  ══════════════════════════════════════════════ -->
-  <div id="app" class="app hidden">
+<!-- ══════════════════════════ APP ══════════════════════════ -->
+<div id="app" class="app hidden">
 
-    <!-- Sidebar -->
-    <aside class="sidebar">
-      <div class="sidebar-header">
-        <span class="logo-mark-sm">◈</span>
-        <span class="sidebar-title">ChillSpace</span>
-      </div>
+  <!-- LEFT: Chat Column -->
+  <section class="chat-col">
 
-      <div class="sidebar-section">
-        <div class="sidebar-label">ROOMS</div>
-        <ul id="room-list" class="room-list"></ul>
-        <button id="create-room-btn" class="create-room-btn">＋ new room</button>
-      </div>
-
-      <div class="sidebar-section sidebar-users-section">
-        <div class="sidebar-label">ONLINE NOW</div>
-        <ul id="user-list" class="user-list"></ul>
-      </div>
-
-      <div class="sidebar-footer">
-        <div class="my-avatar" id="my-avatar">?</div>
-        <span id="my-username" class="my-name">—</span>
-      </div>
-    </aside>
-
-    <!-- Chat area -->
-    <main class="chat-area">
-      <header class="chat-header">
-        <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle sidebar">☰</button>
+    <header class="chat-header">
+      <div class="chat-header-left">
         <span class="hash">#</span>
         <span id="current-room-name" class="current-room">general</span>
-        <span id="room-lock-icon" class="room-lock-icon hidden">🔒</span>
+        <span id="room-lock-icon" class="room-lock hidden">🔒</span>
+      </div>
+      <div class="chat-header-right">
         <span id="room-member-count" class="member-count"></span>
-      </header>
-
-      <div id="messages" class="messages"></div>
-
-      <div id="typing-indicator" class="typing-indicator"></div>
-
-      <!-- Input bar with mic button -->
-      <div class="input-bar">
-        <button id="mic-btn" class="mic-btn" aria-label="Hold to record voice note" title="Hold to record">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-            <line x1="12" y1="19" x2="12" y2="23"/>
-            <line x1="8" y1="23" x2="16" y2="23"/>
-          </svg>
+        <button id="invite-btn" class="icon-btn hidden" title="Copy invite link">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
         </button>
-        <input id="msg-input" type="text" placeholder="say something…" maxlength="500" autocomplete="off"/>
-        <button id="send-btn" class="send-btn" aria-label="Send">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="22" y1="2" x2="11" y2="13"/>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-          </svg>
+        <button id="panel-toggle" class="icon-btn panel-toggle-btn" title="Toggle panel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
         </button>
       </div>
+    </header>
 
-      <!-- Recording overlay -->
-      <div id="recording-overlay" class="recording-overlay hidden">
-        <div class="recording-inner">
-          <div class="recording-pulse"></div>
-          <span class="recording-text">Recording… release to send</span>
-          <span id="recording-timer" class="recording-timer">0:00</span>
+    <!-- Reply preview bar -->
+    <div id="reply-bar" class="reply-bar hidden">
+      <div class="reply-bar-inner">
+        <span class="reply-bar-label">replying to</span>
+        <span id="reply-bar-name" class="reply-bar-name"></span>
+        <span id="reply-bar-text" class="reply-bar-text"></span>
+      </div>
+      <button id="reply-cancel" class="reply-cancel-btn">✕</button>
+    </div>
+
+    <div id="messages" class="messages"></div>
+
+    <div id="typing-indicator" class="typing-indicator"></div>
+
+    <div class="input-bar">
+      <button id="mic-btn" class="mic-btn" title="Hold to record">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      </button>
+      <input id="msg-input" type="text" placeholder="say something…" maxlength="500" autocomplete="off"/>
+      <button id="send-btn" class="send-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+
+    <!-- Recording overlay -->
+    <div id="recording-overlay" class="recording-overlay hidden">
+      <div class="recording-inner">
+        <div class="recording-pulse"></div>
+        <span class="recording-text">Recording… release to send</span>
+        <span id="recording-timer" class="recording-timer">0:00</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT: Panel Column -->
+  <aside id="right-panel" class="right-panel">
+
+    <!-- Profile Section -->
+    <div class="panel-section profile-section">
+      <div class="profile-avatar-wrap">
+        <div id="panel-avatar" class="panel-avatar">?</div>
+        <div class="avatar-color-ring" id="avatar-color-ring"></div>
+      </div>
+      <div class="profile-info">
+        <div id="panel-username" class="panel-username">—</div>
+        <!-- Status selector -->
+        <div class="status-selector">
+          <button class="status-btn active" data-status="online">
+            <span class="status-dot online"></span>Online
+          </button>
+          <button class="status-btn" data-status="busy">
+            <span class="status-dot busy"></span>Busy
+          </button>
+          <button class="status-btn" data-status="offline">
+            <span class="status-dot offline"></span>Offline
+          </button>
         </div>
       </div>
-    </main>
-  </div>
+    </div>
 
-  <!-- ══════════════════════════════════════════════
-       MODAL: Create Room
-  ══════════════════════════════════════════════ -->
-  <div id="create-room-modal" class="modal-overlay hidden">
-    <div class="modal">
-      <h2 class="modal-title">create a room</h2>
-      <input id="new-room-input" type="text" placeholder="room name (e.g. late-night-vibes)" maxlength="20" autocomplete="off"/>
-
-      <!-- Public / Private toggle -->
-      <div class="privacy-toggle">
-        <button id="toggle-public" class="privacy-btn active" data-value="public">
-          🌐 Public
-        </button>
-        <button id="toggle-private" class="privacy-btn" data-value="private">
-          🔒 Private
-        </button>
-      </div>
-
-      <!-- Password field (shown only for private) -->
-      <div id="password-wrap" class="password-wrap hidden">
-        <input id="room-password-input" type="password" placeholder="set a room password" maxlength="32" autocomplete="off"/>
-        <p class="password-hint">Friends need this password to join 🤫</p>
-      </div>
-
-      <div class="modal-actions">
-        <button id="modal-cancel" class="modal-btn cancel">cancel</button>
-        <button id="modal-confirm" class="modal-btn confirm">create →</button>
+    <!-- Bio edit -->
+    <div class="panel-section bio-section">
+      <div class="panel-label">BIO</div>
+      <textarea id="bio-input" class="bio-input" placeholder="write something about yourself…" maxlength="100" rows="2"></textarea>
+      <div class="bio-actions">
+        <span id="bio-char-count" class="bio-char">0/100</span>
+        <button id="save-bio-btn" class="save-bio-btn">save</button>
       </div>
     </div>
-  </div>
 
-  <!-- ══════════════════════════════════════════════
-       MODAL: Enter Password (join private room)
-  ══════════════════════════════════════════════ -->
-  <div id="password-modal" class="modal-overlay hidden">
-    <div class="modal">
-      <h2 class="modal-title">🔒 private room</h2>
-      <p class="modal-sub">Enter password to join <strong id="password-modal-room-name"></strong></p>
-      <input id="join-password-input" type="password" placeholder="room password…" maxlength="32" autocomplete="off"/>
-      <p id="password-error" class="password-error hidden">Wrong password! Try again 😅</p>
-      <div class="modal-actions">
-        <button id="password-modal-cancel" class="modal-btn cancel">cancel</button>
-        <button id="password-modal-confirm" class="modal-btn confirm">join →</button>
+    <!-- Avatar color picker -->
+    <div class="panel-section color-section">
+      <div class="panel-label">AVATAR COLOR</div>
+      <div class="color-grid" id="color-grid">
+        <button class="color-swatch active" data-color="#f5a623" style="background:#f5a623"></button>
+        <button class="color-swatch" data-color="#f87171" style="background:#f87171"></button>
+        <button class="color-swatch" data-color="#4ade80" style="background:#4ade80"></button>
+        <button class="color-swatch" data-color="#60a5fa" style="background:#60a5fa"></button>
+        <button class="color-swatch" data-color="#a78bfa" style="background:#a78bfa"></button>
+        <button class="color-swatch" data-color="#f472b6" style="background:#f472b6"></button>
+        <button class="color-swatch" data-color="#34d399" style="background:#34d399"></button>
+        <button class="color-swatch" data-color="#fbbf24" style="background:#fbbf24"></button>
+        <button class="color-swatch" data-color="#e879f9" style="background:#e879f9"></button>
+        <button class="color-swatch" data-color="#22d3ee" style="background:#22d3ee"></button>
       </div>
     </div>
-  </div>
 
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="script.js"></script>
+    <div class="panel-divider"></div>
+
+    <!-- Rooms -->
+    <div class="panel-section rooms-section">
+      <div class="panel-label-row">
+        <span class="panel-label">ROOMS</span>
+        <button id="create-room-btn" class="create-room-btn" title="Create room">＋</button>
+      </div>
+      <ul id="room-list" class="room-list"></ul>
+    </div>
+
+    <div class="panel-divider"></div>
+
+    <!-- Online Users -->
+    <div class="panel-section users-section">
+      <div class="panel-label">ONLINE NOW</div>
+      <ul id="user-list" class="user-list"></ul>
+    </div>
+
+  </aside>
+</div>
+
+<!-- ══════════ MODAL: Create Room ══════════ -->
+<div id="create-room-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <h2 class="modal-title">new room</h2>
+    <input id="new-room-input" type="text" placeholder="room-name" maxlength="20" autocomplete="off"/>
+    <div class="privacy-toggle">
+      <button id="toggle-public"  class="privacy-btn active">🌐 Public</button>
+      <button id="toggle-private" class="privacy-btn">🔒 Private</button>
+    </div>
+    <div id="password-wrap" class="password-wrap hidden">
+      <input id="room-password-input" type="password" placeholder="set a password" maxlength="32" autocomplete="off"/>
+      <p class="field-hint">friends need this to join 🤫</p>
+    </div>
+    <div class="modal-actions">
+      <button id="modal-cancel"  class="modal-btn cancel">cancel</button>
+      <button id="modal-confirm" class="modal-btn confirm">create →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ MODAL: Join Private Room ══════════ -->
+<div id="password-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <h2 class="modal-title">🔒 private room</h2>
+    <p class="modal-sub">Enter password to join <strong id="pw-modal-room-name"></strong></p>
+    <input id="join-password-input" type="password" placeholder="room password…" maxlength="32" autocomplete="off"/>
+    <p id="password-error" class="field-error hidden">Wrong password! 😅</p>
+    <div class="modal-actions">
+      <button id="pw-modal-cancel"  class="modal-btn cancel">cancel</button>
+      <button id="pw-modal-confirm" class="modal-btn confirm">join →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast hidden"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="script.js"></script>
 </body>
-          </html>
+  </html>
