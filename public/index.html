@@ -12,7 +12,7 @@
 <body>
 
   <!-- ══════════════════════════════════════════════
-       LANDING / USERNAME SCREEN
+       LANDING SCREEN
   ══════════════════════════════════════════════ -->
   <div id="landing" class="landing">
     <div class="landing-card">
@@ -20,18 +20,11 @@
       <h1 class="landing-title">Chill<span>Space</span></h1>
       <p class="landing-sub">your tiny corner of the internet</p>
       <div class="input-wrap">
-        <input
-          id="username-input"
-          type="text"
-          placeholder="what do your friends call you?"
-          maxlength="24"
-          autocomplete="off"
-        />
+        <input id="username-input" type="text" placeholder="what do your friends call you?" maxlength="24" autocomplete="off"/>
         <button id="join-btn">enter →</button>
       </div>
       <p class="landing-hint">no signup · no tracking · just vibes</p>
     </div>
-    <!-- decorative blobs -->
     <div class="blob blob-1"></div>
     <div class="blob blob-2"></div>
     <div class="blob blob-3"></div>
@@ -42,72 +35,98 @@
   ══════════════════════════════════════════════ -->
   <div id="app" class="app hidden">
 
-    <!-- ── Sidebar ── -->
+    <!-- Sidebar -->
     <aside class="sidebar">
       <div class="sidebar-header">
         <span class="logo-mark-sm">◈</span>
         <span class="sidebar-title">ChillSpace</span>
       </div>
 
-      <!-- Rooms list -->
       <div class="sidebar-section">
         <div class="sidebar-label">ROOMS</div>
         <ul id="room-list" class="room-list"></ul>
         <button id="create-room-btn" class="create-room-btn">＋ new room</button>
       </div>
 
-      <!-- Online users -->
       <div class="sidebar-section sidebar-users-section">
         <div class="sidebar-label">ONLINE NOW</div>
         <ul id="user-list" class="user-list"></ul>
       </div>
 
-      <!-- Current user badge -->
       <div class="sidebar-footer">
         <div class="my-avatar" id="my-avatar">?</div>
         <span id="my-username" class="my-name">—</span>
       </div>
     </aside>
 
-    <!-- ── Main chat area ── -->
+    <!-- Chat area -->
     <main class="chat-area">
-
-      <!-- Header -->
       <header class="chat-header">
         <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle sidebar">☰</button>
         <span class="hash">#</span>
         <span id="current-room-name" class="current-room">general</span>
+        <span id="room-lock-icon" class="room-lock-icon hidden">🔒</span>
         <span id="room-member-count" class="member-count"></span>
       </header>
 
-      <!-- Messages -->
       <div id="messages" class="messages"></div>
 
-      <!-- Typing indicator -->
       <div id="typing-indicator" class="typing-indicator"></div>
 
-      <!-- Input bar -->
+      <!-- Input bar with mic button -->
       <div class="input-bar">
-        <input
-          id="msg-input"
-          type="text"
-          placeholder="say something…"
-          maxlength="500"
-          autocomplete="off"
-        />
+        <button id="mic-btn" class="mic-btn" aria-label="Hold to record voice note" title="Hold to record">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </button>
+        <input id="msg-input" type="text" placeholder="say something…" maxlength="500" autocomplete="off"/>
         <button id="send-btn" class="send-btn" aria-label="Send">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
         </button>
       </div>
-    </main>
 
+      <!-- Recording overlay -->
+      <div id="recording-overlay" class="recording-overlay hidden">
+        <div class="recording-inner">
+          <div class="recording-pulse"></div>
+          <span class="recording-text">Recording… release to send</span>
+          <span id="recording-timer" class="recording-timer">0:00</span>
+        </div>
+      </div>
+    </main>
   </div>
 
-  <!-- Modal: create room -->
+  <!-- ══════════════════════════════════════════════
+       MODAL: Create Room
+  ══════════════════════════════════════════════ -->
   <div id="create-room-modal" class="modal-overlay hidden">
     <div class="modal">
       <h2 class="modal-title">create a room</h2>
-      <input id="new-room-input" type="text" placeholder="room name (e.g. lofi-beats)" maxlength="20" autocomplete="off"/>
+      <input id="new-room-input" type="text" placeholder="room name (e.g. late-night-vibes)" maxlength="20" autocomplete="off"/>
+
+      <!-- Public / Private toggle -->
+      <div class="privacy-toggle">
+        <button id="toggle-public" class="privacy-btn active" data-value="public">
+          🌐 Public
+        </button>
+        <button id="toggle-private" class="privacy-btn" data-value="private">
+          🔒 Private
+        </button>
+      </div>
+
+      <!-- Password field (shown only for private) -->
+      <div id="password-wrap" class="password-wrap hidden">
+        <input id="room-password-input" type="password" placeholder="set a room password" maxlength="32" autocomplete="off"/>
+        <p class="password-hint">Friends need this password to join 🤫</p>
+      </div>
+
       <div class="modal-actions">
         <button id="modal-cancel" class="modal-btn cancel">cancel</button>
         <button id="modal-confirm" class="modal-btn confirm">create →</button>
@@ -115,8 +134,23 @@
     </div>
   </div>
 
-  <!-- Socket.IO client (served automatically by the server) -->
+  <!-- ══════════════════════════════════════════════
+       MODAL: Enter Password (join private room)
+  ══════════════════════════════════════════════ -->
+  <div id="password-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <h2 class="modal-title">🔒 private room</h2>
+      <p class="modal-sub">Enter password to join <strong id="password-modal-room-name"></strong></p>
+      <input id="join-password-input" type="password" placeholder="room password…" maxlength="32" autocomplete="off"/>
+      <p id="password-error" class="password-error hidden">Wrong password! Try again 😅</p>
+      <div class="modal-actions">
+        <button id="password-modal-cancel" class="modal-btn cancel">cancel</button>
+        <button id="password-modal-confirm" class="modal-btn confirm">join →</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/socket.io/socket.io.js"></script>
   <script src="script.js"></script>
 </body>
-</html>
+          </html>
