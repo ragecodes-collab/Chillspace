@@ -87,6 +87,8 @@ let recordingInterval  = null;
 
 // ── Utils ─────────────────────────────────────────────────────
 const initial  = n  => n.charAt(0).toUpperCase();
+// Soft color-tinted avatar background derived from a user's color
+const avatarStyle = c => `background: radial-gradient(circle at 32% 28%, ${c}3a, ${c}12); color:${c}; border-color:${c}66`;
 const esc      = s  => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#x27;");
 const fmtTime  = s  => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,"0")}`;
 const scrollBot = () => { messagesEl.scrollTop = messagesEl.scrollHeight; };
@@ -137,6 +139,8 @@ function updateProfileUI() {
   panelAvatar.textContent    = initial(myUsername);
   panelAvatar.style.color    = myAvatarColor;
   panelAvatar.style.borderColor = myAvatarColor;
+  panelAvatar.style.background = `radial-gradient(circle at 32% 28%, ${myAvatarColor}3a, ${myAvatarColor}12)`;
+  panelAvatar.style.boxShadow  = `0 0 0 4px ${myAvatarColor}14`;
   bioInput.value             = myBio;
   bioCharCount.textContent   = `${myBio.length}/100`;
 
@@ -212,7 +216,7 @@ function renderUsers(users) {
     li.className = "user-item";
     const color = avatarColor || "#f5a623";
     li.innerHTML = `
-      <div class="user-item-avatar" style="color:${color}; border: 1.5px solid ${color}40">
+      <div class="user-item-avatar" style="${avatarStyle(color)}; border-width:1.5px; border-style:solid">
         ${initial(username)}
         <span class="user-status-badge ${status || "online"}"></span>
       </div>
@@ -240,7 +244,7 @@ function appendMessage({ id, username, avatarColor, text, time, replyTo }) {
   ` : "";
 
   div.innerHTML = `
-    <div class="msg-avatar" style="color:${color}; border-color:${color}40">${initial(username)}</div>
+    <div class="msg-avatar" style="${avatarStyle(color)}">${initial(username)}</div>
     <div class="msg-body">
       ${replyHtml}
       <div class="msg-meta">
@@ -271,7 +275,7 @@ function appendVoiceNote({ username, avatarColor, audioData, duration, time }) {
   const div = document.createElement("div");
   div.className = "msg" + (isOwn ? " own" : "");
   div.innerHTML = `
-    <div class="msg-avatar" style="color:${color}; border-color:${color}40">${initial(username)}</div>
+    <div class="msg-avatar" style="${avatarStyle(color)}">${initial(username)}</div>
     <div class="msg-body">
       <div class="msg-meta">
         <span class="msg-author" style="color:${color}">${esc(username)}</span>
